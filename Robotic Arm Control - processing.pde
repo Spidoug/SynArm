@@ -840,37 +840,36 @@ void drawTextInterface() {
 // Mouse Interaction
 // ==============================
 void mousePressed() {
+
   // 🔁 Reconnect button
-  if (mouseX >= 20 && mouseX <= 280 && mouseY >= height - 60 && mouseY <= height - 25) {
+  if (mouseX >= 20 && mouseX <= 280 &&
+      mouseY >= height - 60 && mouseY <= height - 25) {
+
     updateMessage("🔄 Restarting connection...");
     initializationStep = 0;
-    arduinoReady = false;
-    leapAvailable = false;
+    arduinoReady     = false;
+    leapAvailable    = false;
     initializeLog();
 
-    portIndex = 0;
+    portIndex        = 0;
     arduinoStartTime = 0;
-    waiting = false;
-    waitDuration = 0;
-    waitStartTime = 0;
+    waiting          = false;
+    waitDuration     = 0;
+    waitStartTime    = 0;
 
     if (testPort != null) {
-      try {
-        testPort.stop();
-      }
+      try { testPort.stop(); }
       catch (Exception e) {
-        println("⚠️ Erro ao parar testPort:");
+        println("⚠️ Error stopping testPort:");
         e.printStackTrace();
       }
       testPort = null;
     }
 
     if (myPort != null) {
-      try {
-        myPort.stop();
-      }
+      try { myPort.stop(); }
       catch (Exception e) {
-        println("⚠️ Erro ao parar myPort:");
+        println("⚠️ Error stopping myPort:");
         e.printStackTrace();
       }
       myPort = null;
@@ -879,58 +878,69 @@ void mousePressed() {
     updateMessage("🔁 Restarting device detection...");
   }
 
-  // ▶️ Sample record/play buttons
+  // ▶️ Sample record / play buttons
   for (int i = 0; i < 5; i++) {
     int y1 = 20 + i * 50;
-    if (mouseX >= 20 && mouseX <= 280 && mouseY >= y1 && mouseY <= y1 + 35) {
+
+    if (mouseX >= 20 && mouseX <= 280 &&
+        mouseY >= y1 && mouseY <= y1 + 35) {
+
+      // ——— STOP recording ———
       if (recording && selectedSample == i) {
-        // ⏹ STOP recording
         recording = false;
+
         File file = new File(sketchPath("data/samples/sample_" + i + ".json"));
 
         if (!file.exists()) {
           JSONArray jsonArray = new JSONArray();
           for (int[] frame : samples[i]) {
             JSONArray frameArray = new JSONArray();
-            for (int val : frame) {
-              frameArray.append(val);
-            }
+            for (int val : frame) frameArray.append(val);
             jsonArray.append(frameArray);
           }
 
           try {
             saveJSONArray(jsonArray, file.getAbsolutePath());
             updateMessage("💾 Sample " + (i + 1) + " saved successfully.");
-          }
-          catch (Exception e) {
-            println("❌ Erro ao salvar sample " + (i + 1) + ": " + e.getMessage());
+          } catch (Exception e) {
+            println("❌ Error saving sample " + (i + 1) + ": " + e.getMessage());
             e.printStackTrace();
-            updateMessage("⚠ Falha ao salvar o sample " + (i + 1));
+            updateMessage("⚠️ Failed to save sample " + (i + 1));
           }
         } else {
           updateMessage("⚠️ File already exists. Recording not overwritten.");
         }
 
         selectedSample = -1;
-      } else if (!recording && !isPlaying()) {
-        // ▶ START playback or 🔴 recording
+      }
+
+      // ——— START playback or recording ———
+      else if (!recording && !isPlaying()) {
+
+        // ▶ Playback
         if (samples[i].size() > 0) {
-          playingBack[i] = true;
+          playingBack[i]   = true;
           playbackIndex[i] = 0;
           lastFrameTime[i] = millis();
-          updateMessage("▶️ Playing Sample " + (i + 1));
-        } else {
+          updateMessage("▶️ Playing sample " + (i + 1));
+        }
+
+        // 🔴 Record
+        else {
           File file = new File(sketchPath("data/samples/sample_" + i + ".json"));
           if (file.exists()) {
             updateMessage("⚠️ Slot " + (i + 1) + " already has a recording.");
           } else {
-            recording = true;
+            recording      = true;
             selectedSample = i;
             samples[i].clear();
-            updateMessage("🔴 Recording Sample " + (i + 1));
+            updateMessage("🔴 Recording sample " + (i + 1));
           }
         }
-      } else {
+      }
+
+      // ——— Busy with another sample ———
+      else {
         updateMessage("⚠️ Cannot record or play while another sample is active.");
       }
     }
@@ -1441,11 +1451,10 @@ void maybeSetAngle(int channel, int value) {
 
 // ---------- Safe helpers (no array API) ----------
 ControlSlider safeSlider(String name, int fallbackIdx) {
-  // 1) tenta pelo nome definido no XML
+
   try { return joystick.getSlider(name); }
   catch (Exception ignored) { }
 
-  // 2) fallback: pega pelo índice se existir
   return (fallbackIdx < joystick.getNumberOfSliders())
          ? joystick.getSlider(fallbackIdx)
          : null;
@@ -1478,4 +1487,3 @@ void createDefaultJoystickXML(ControlDevice dev){
   saveStrings("data/gamecontrol.xml", lines);
   println("✅ Default gamecontrol.xml created for device: "+dev.getName());
 }
-
