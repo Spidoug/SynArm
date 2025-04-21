@@ -1,20 +1,8 @@
 // =====================================================================
 //  SynArm
 //  Robotic Arm Control – Leap Motion · Joystick · Keyboard · WebSockets
-//  Full Processing sketch (P3D) — updated to use the Processing
-//  websockets library  ( https://github.com/alessandrosignoretti/processing-websockets )
-//
-//  ➡  NEW in this version
-//      • import websockets.*  –  adds a built‑in WebSocket server so that
-//        external clients (e.g. a Node/React front‑end, mobile app or another
-//        Processing sketch) can monitor or command the arm in real‑time.
-//      • Automatic JSON broadcast on every servo move
-//      • Incoming JSON commands added to the existing pendingWsCommands queue
-//        and processed together with Leap / Joystick / Keyboard logic.
-//
-//  Tested with websockets 0.4.3 (Contribution Manager → Libraries → "Websockets").
 // ---------------------------------------------------------------------
-//  ✉ Douglas (SPIDOUG) · April 2025
+//  ✉ Douglas Santana (SPIDOUG)
 // =====================================================================
 
 // ==============================
