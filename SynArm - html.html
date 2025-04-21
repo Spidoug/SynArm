@@ -1,40 +1,104 @@
+<!-- =====================================================================
+  SynArm – WebSocket Console
+  Robotic Arm Control Dashboard (HTML · CSS · JS)
+  © 2025 Douglas Santana (SPIDOUG)
+===================================================================== -->
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
-<meta charset="utf-8">
-<title>Robotic Arm Console</title>
-<style>
-  :root{
-    --side:#f3f3f3;      /* cor sidebar Processing */
-    --bg:#1e1e1e;        /* cor área 3D Processing */
-    --primary:#46a0ff;   /* azul botões Processing */
-    --text:#111;
-  }
-  *{box-sizing:border-box;font-family:system-ui, sans-serif}
-  body{margin:0;display:flex;height:100vh}
-  /* Sidebar ---------------------------------------------------------- */
-  #side{
-    width:300px;background:var(--side);padding:1.2rem;overflow-y:auto;
-    display:flex;flex-direction:column;gap:1rem;border-right:1px solid #ccc
-  }
-    h2{margin:.2rem 0 .6rem;font-size:1.1rem;color:var(--text)}
-    .servo label{display:flex;justify-content:space-between;font-size:.85rem}
-    input[type=range]{width:100%}
-    .status{margin-top:1rem;font-size:.8rem}
-  /* Main board ------------------------------------------------------- */
-  #main{
-    flex:1;background:var(--bg);color:#ddd;padding:1.2rem;display:flex;
-    flex-direction:column;gap:1rem
-  }
-    .panel{
-      background:#0003;border:1px solid #444;border-radius:6px;padding:.8rem;
-      flex:1;display:flex;flex-direction:column;position:relative
+  <meta charset="utf-8">
+  <title>Robotic Arm Console</title>
+  <style>
+    :root {
+      /* ───── Color palette ───── */
+      --side:    #f3f3f3; /* sidebar background */
+      --bg:      #1e1e1e; /* 3‑D canvas background */
+      --primary: #46a0ff; /* button accent */
+      --text:    #111;    /* dark text */
     }
-    .panel h3{margin:0 0 .6rem;font-size:.95rem;font-weight:500}
-    #sensorGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:.4rem}
-    .cell{font:600 .8rem/1.4 monospace;color:#8cf}
-    .raw{position:absolute;bottom:.8rem;left:.8rem;font:.75rem/1.2 monospace;color:#aaa}
-</style>
+
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, sans-serif;
+    }
+
+    body {
+      margin: 0;
+      display: flex;
+      height: 100vh;
+    }
+
+    /* ───────────────────────────────────────────────── Sidebar ── */
+    #side {
+      width: 300px;
+      background: var(--side);
+      padding: 1.2rem;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      border-right: 1px solid #ccc;
+    }
+      h2 {
+        margin: .2rem 0 .6rem;
+        font-size: 1.1rem;
+        color: var(--text);
+      }
+      .servo label {
+        display: flex;
+        justify-content: space-between;
+        font-size: .85rem;
+      }
+      input[type="range"] {
+        width: 100%;
+      }
+      .status {
+        margin-top: 1rem;
+        font-size: .8rem;
+      }
+
+    /* ───────────────────────────────────────────────── Main area ── */
+    #main {
+      flex: 1;
+      background: var(--bg);
+      color: #ddd;
+      padding: 1.2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+      .panel {
+        background: #0003;
+        border: 1px solid #444;
+        border-radius: 6px;
+        padding: .8rem;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+      }
+      .panel h3 {
+        margin: 0 0 .6rem;
+        font-size: .95rem;
+        font-weight: 500;
+      }
+      #sensorGrid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: .4rem;
+      }
+      .cell {
+        font: 600 .8rem/1.4 monospace;
+        color: #8cf;
+      }
+      .raw {
+        position: absolute;
+        bottom: .8rem;
+        left: .8rem;
+        font: .75rem/1.2 monospace;
+        color: #aaa;
+      }
+  </style>
 </head>
 <body>
 
@@ -44,37 +108,39 @@
   <div id="controls"></div>
 
   <div class="status">
-    <div id="wsStatus">WebSocket: ❌ desconectado</div>
+    <div id="wsStatus">WebSocket: ❌ disconnected</div>
     <div id="lastStamp">—</div>
   </div>
 </aside>
 
-<!-- ░░ Painéis principais ░░ -->
+<!-- ░░ Main panels ░░ -->
 <main id="main">
   <section class="panel">
-    <h3>📊 Sensores &nbsp;<small id="sensStamp">(—)</small></h3>
+    <h3>📊 Sensors &nbsp;<small id="sensStamp">(—)</small></h3>
     <div id="sensorGrid"></div>
     <div class="raw" id="rawLine"></div>
   </section>
 
   <section class="panel" style="max-height:160px;flex:none">
-    <h3>⚙️ Últimos Ângulos</h3>
+    <h3>⚙️ Last Angles</h3>
     <div id="angleGrid" style="display:flex;gap:.8rem;flex-wrap:wrap"></div>
   </section>
 </main>
 
 <script>
-const WS_URL = "ws://localhost:9000/";
-const sideCtl = document.getElementById("controls");
-const wsStatus= document.getElementById("wsStatus");
-const angleDiv= document.getElementById("angleGrid");
+// ============================== Constants
+const WS_URL   = "ws://localhost:9000/";
+const sideCtl  = document.getElementById("controls");
+const wsStatus = document.getElementById("wsStatus");
+const angleDiv = document.getElementById("angleGrid");
 const sensGrid = document.getElementById("sensorGrid");
 const sensStamp= document.getElementById("sensStamp");
 const rawLine  = document.getElementById("rawLine");
 const lastStamp= document.getElementById("lastStamp");
-const mapping  = [0,1,2,13,14,15];
-/* criar sliders + displays --------------------------------------- */
-mapping.forEach(ch=>{
+const mapping  = [0, 1, 2, 13, 14, 15];
+
+/* ───── Create sliders & readouts ─────────────────────────────── */
+mapping.forEach(ch => {
   const wrap = document.createElement("div");
   wrap.className = "servo";
   wrap.innerHTML = `
@@ -82,58 +148,78 @@ mapping.forEach(ch=>{
     <input id="s${ch}" type="range" min="0" max="180" value="90">`;
   sideCtl.appendChild(wrap);
 
-  wrap.querySelector("input").addEventListener("input",e=>{
-    document.getElementById("v"+ch).textContent = e.target.value+"°";
-    if(ws?.readyState===1)
-      ws.send(JSON.stringify({servo:ch,angle:+e.target.value}));
+  // Send angle live over WebSocket
+  wrap.querySelector("input").addEventListener("input", e => {
+    document.getElementById("v" + ch).textContent = e.target.value + "°";
+    if (ws?.readyState === 1)
+      ws.send(JSON.stringify({ servo: ch, angle: +e.target.value }));
   });
 
-  /* grade para ângulos mais abaixo */
+  /* angle badges in lower panel */
   const tag = document.createElement("div");
-  tag.id = "ang"+ch;
+  tag.id = "ang" + ch;
   tag.textContent = `S${ch}: 90°`;
   angleDiv.appendChild(tag);
 });
-/* helpers --------------------------------------------------------- */
-const upStamp  = el => el.textContent = new Date().toLocaleTimeString();
-const updateAngle = (ch,val)=>{
-  document.getElementById("s"+ch).value = val;
-  document.getElementById("v"+ch).textContent = val+"°";
-  document.getElementById("ang"+ch).textContent = `S${ch}: ${val}°`;
+
+/* ───── Utility functions ─────────────────────────────────────── */
+const stampNow   = el => el.textContent = new Date().toLocaleTimeString();
+const updateAngle = (ch, val) => {
+  document.getElementById("s" + ch).value           = val;
+  document.getElementById("v" + ch).textContent     = val + "°";
+  document.getElementById("ang" + ch).textContent   = `S${ch}: ${val}°`;
 };
-/* conectar WebSocket --------------------------------------------- */
+
+/* ───── WebSocket connection ─────────────────────────────────── */
 let ws;
-function connect(){
+function connect() {
   ws = new WebSocket(WS_URL);
-  ws.onopen = ()=>{ wsStatus.textContent="WebSocket: 🟢 conectado"; upStamp(lastStamp); };
-  ws.onclose= ()=>{ wsStatus.textContent="WebSocket: ❌ desconectado"; };
+
+  ws.onopen  = () => {
+    wsStatus.textContent = "WebSocket: 🟢 connected";
+    stampNow(lastStamp);
+  };
+
+  ws.onclose = () => {
+    wsStatus.textContent = "WebSocket: ❌ disconnected";
+  };
+
   ws.onerror = err => console.error(err);
+
   ws.onmessage = ev => {
-    try{
-      const d=JSON.parse(ev.data);
-      if("servo" in d && "angle" in d){
-        updateAngle(d.servo,d.angle);
-        upStamp(lastStamp);
+    try {
+      const d = JSON.parse(ev.data);
+
+      // Live servo update
+      if ("servo" in d && "angle" in d) {
+        updateAngle(d.servo, d.angle);
+        stampNow(lastStamp);
       }
-      if("serial" in d){
+
+      // Raw serial packet
+      if ("serial" in d) {
         rawLine.textContent = d.serial;
-        upStamp(lastStamp);
-        if(d.serial.startsWith("#SENS|")) parseSensors(d.serial);
+        stampNow(lastStamp);
+        if (d.serial.startsWith("#SENS|")) parseSensors(d.serial);
       }
-    }catch(e){console.warn("Bad WS message:",ev.data)}
+    } catch (e) {
+      console.warn("Malformed WS message:", ev.data);
+    }
   };
 }
 connect();
-/* parse pacote #SENS|MPU:...|AN:... ------------------------------- */
-function parseSensors(line){
+
+/* ───── Parse packet  #SENS|MPU:...|AN:... ─────────────────────── */
+function parseSensors(line) {
   sensStamp.textContent = new Date().toLocaleTimeString();
-  sensGrid.innerHTML = "";                      // limpa e re‑exibe
+  sensGrid.innerHTML = ""; // clear grid
+
   const payload = line.slice(6).split("|");
-  payload.forEach(pair=>{
-    const [k,v]=pair.split(":");
-    const cell=document.createElement("div");
-    cell.className="cell";
-    cell.textContent=`${k}: ${v}`;
+  payload.forEach(pair => {
+    const [k, v] = pair.split(":");
+    const cell   = document.createElement("div");
+    cell.className = "cell";
+    cell.textContent = `${k}: ${v}`;
     sensGrid.appendChild(cell);
   });
 }
