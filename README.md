@@ -21,6 +21,9 @@ A WebSocket bridge exposes the arm state to external clients; a lightweight HTML
 ---
 
 ## 3. Hardware Stack
+
+![image](https://github.com/user-attachments/assets/03ed05e9-59c3-4dda-a3e7-aaf0dca4f212)
+
 | Sub‑system | Part | Notes |
 |------------|------|-------|
 | MCU & Power | **Arduino Uno R3** | 16 MHz ATmega328P, powered from USB 5 V (logic only) |
