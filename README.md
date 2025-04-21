@@ -3,7 +3,7 @@
 ## 1. Executive Summary
 SynArm is a multimodal control framework for a 6‑DOF robotic arm that targets low‑cost hobby servos (TD8120MG) driven by a PCA9685 PWM expander.  The project integrates **Leap Motion** gestural input, **joystick/keyboard** fallback, real‑time 3‑D visualisation in Processing 4, and an **Arduino Uno**‑based firmware that also supports a stepper‑driven linear axis and on‑board inertial sensing (MPU6050).
 
-![image](https://github.com/user-attachments/assets/3b17cf57-36c6-40cc-9b69-6382d4a23c35)
+![image](https://github.com/user-attachments/assets/630dd27b-5c37-4317-8ebc-3588b76aa993)
 
 https://github.com/user-attachments/assets/0a86b27f-d8db-4aad-b719-9c595e23936b
 
