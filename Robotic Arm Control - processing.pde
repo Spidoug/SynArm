@@ -83,13 +83,13 @@ float cameraRotationIncrement = 0;
 String controlInstructions =
   "🎮 ARM CONTROL (KEYBOARD)\n" +
   "\n" +
-  "  Q / A   →  Base        \n" +
-  "  W / S   →  Shoulder    \n" +
-  "  E / D   →  Elbow       \n" +
-  "  R / F   →  Wrist Tilt  \n" +
-  "  T / G   →  Wrist Rot.  \n" +
-  "  Y / H   →  Gripper     \n" +
-  "  ← / → : Rotate camera";
+  "  Q / A   :  Base        \n" +
+  "  W / S   :  Shoulder    \n" +
+  "  E / D   :  Elbow       \n" +
+  "  R / F   :  Wrist Tilt  \n" +
+  "  T / G   :  Wrist Rot.  \n" +
+  "  Y / H   :  Gripper     \n" +
+  "  ← / →   :  Rotate camera";
 
 // ==============================
 // 🤖 Servo Angles
