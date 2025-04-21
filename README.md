@@ -5,6 +5,8 @@ SynArm is a multimodal control framework for a 6‑DOF robotic arm that targets 
 
 ![image](https://github.com/user-attachments/assets/7573b612-2e9a-408b-b788-a215d2eb2835)
 
+https://github.com/user-attachments/assets/0a86b27f-d8db-4aad-b719-9c595e23936b
+
 A WebSocket bridge exposes the arm state to external clients; a lightweight HTML5 dashboard demonstrates live telemetry and command streaming.
 
 ---
