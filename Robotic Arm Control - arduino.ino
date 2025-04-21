@@ -1,6 +1,6 @@
 // =====================================================================
 //  SynArm
-//  Robotic Arm Control – Leap Motion · Joystick · Keyboard · WebSockets
+//  Robotic Arm Control – Firmware
 // ---------------------------------------------------------------------
 //  ✉ Douglas Santana (SPIDOUG)
 // =====================================================================
