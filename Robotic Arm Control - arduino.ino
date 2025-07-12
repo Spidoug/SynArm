@@ -192,6 +192,7 @@ void setup() {
   Serial.println();
   delay(500);
   Serial.println(F("SynArm"));
+  Serial.println(F(""));
   delay(500);
   Serial.println(F("Version 1.00"));
   Serial.println();
