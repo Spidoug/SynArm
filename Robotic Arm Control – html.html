@@ -1,10 +1,3 @@
-<!-- =====================================================================
-  SynArm – WebSocket Console
-  Robotic Arm Control Dashboard
--------------------------------------------------------------------------
-  Douglas Santana (SPIDOUG)
-===================================================================== -->
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -12,11 +5,10 @@
   <title>SynArm Console</title>
   <style>
     :root {
-      /* ───── Color palette ───── */
-      --side:    #f3f3f3; /* sidebar background */
-      --bg:      #1e1e1e; /* 3‑D canvas background */
-      --primary: #46a0ff; /* button accent */
-      --text:    #111;    /* dark text */
+      --side:    #f3f3f3;
+      --bg:      #1e1e1e;
+      --primary: #46a0ff;
+      --text:    #111;
     }
 
     * {
@@ -30,8 +22,7 @@
       height: 100vh;
     }
 
-    /* ───────────────────────────────────────────────── Sidebar ── */
-    #side {
+    #sidebar {
       width: 300px;
       background: var(--side);
       padding: 1.2rem;
@@ -41,25 +32,39 @@
       gap: 1rem;
       border-right: 1px solid #ccc;
     }
-      h2 {
-        margin: .2rem 0 .6rem;
-        font-size: 1.1rem;
-        color: var(--text);
-      }
-      .servo label {
-        display: flex;
-        justify-content: space-between;
-        font-size: .85rem;
-      }
-      input[type="range"] {
-        width: 100%;
-      }
-      .status {
-        margin-top: 1rem;
-        font-size: .8rem;
-      }
 
-    /* ───────────────────────────────────────────────── Main area ── */
+    h2 {
+      margin: 0.2rem 0 0.6rem;
+      font-size: 1.1rem;
+      color: var(--text);
+    }
+
+    .servo label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+    }
+
+    input[type="range"] {
+      width: 100%;
+    }
+
+    .status {
+      margin-top: 1rem;
+      font-size: 0.8rem;
+    }
+
+    button.reconnect {
+      padding: 10px;
+      margin-top: 10px;
+      font-weight: bold;
+      background: #ff8c00;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
     #main {
       flex: 1;
       background: var(--bg);
@@ -69,162 +74,229 @@
       flex-direction: column;
       gap: 1rem;
     }
-      .panel {
-        background: #0003;
-        border: 1px solid #444;
-        border-radius: 6px;
-        padding: .8rem;
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        position: relative;
-      }
-      .panel h3 {
-        margin: 0 0 .6rem;
-        font-size: .95rem;
-        font-weight: 500;
-      }
-      #sensorGrid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-        gap: .4rem;
-      }
-      .cell {
-        font: 600 .8rem/1.4 monospace;
-        color: #8cf;
-      }
-      .raw {
-        position: absolute;
-        bottom: .8rem;
-        left: .8rem;
-        font: .75rem/1.2 monospace;
-        color: #aaa;
-      }
+
+    .panel {
+      background: #0003;
+      border: 1px solid #444;
+      border-radius: 6px;
+      padding: 0.8rem;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    .panel h3 {
+      margin: 0 0 0.6rem;
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+
+    #sensorGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: 0.4rem;
+    }
+
+    .cell {
+      font: 600 0.8rem/1.4 monospace;
+      color: #8cf;
+    }
+
+    .raw {
+      position: absolute;
+      bottom: 0.8rem;
+      left: 0.8rem;
+      font: 0.75rem/1.2 monospace;
+      color: #aaa;
+    }
   </style>
 </head>
 <body>
 
-<!-- ░░ Sidebar ░░ -->
-<aside id="side">
-  <h2>🕹️ Servos</h2>
+<aside id="sidebar">
+  <h2> Servo Controls</h2>
   <div id="controls"></div>
-
   <div class="status">
-    <div id="wsStatus">WebSocket: ❌ disconnected</div>
+    <div id="wsStatus">WebSocket: Disconnected</div>
     <div id="lastStamp">—</div>
   </div>
+  <button class="reconnect" onclick="sendReconnectCommand()">Reconnect Arduino</button>
 </aside>
 
-<!-- ░░ Main panels ░░ -->
 <main id="main">
   <section class="panel">
-    <h3>📊 Sensors &nbsp;<small id="sensStamp">(—)</small></h3>
+    <h3> Sensor Data <small id="sensStamp">(—)</small></h3>
     <div id="sensorGrid"></div>
     <div class="raw" id="rawLine"></div>
   </section>
 
-  <section class="panel" style="max-height:160px;flex:none">
-    <h3>⚙️ Last Angles</h3>
-    <div id="angleGrid" style="display:flex;gap:.8rem;flex-wrap:wrap"></div>
+  <section class="panel" style="max-height:160px; flex: none;">
+    <h3> Last Known Angles</h3>
+    <div id="angleGrid" style="display:flex; gap:0.8rem; flex-wrap:wrap"></div>
   </section>
 </main>
 
 <script>
-// ============================== Constants
-const WS_URL   = "ws://localhost:9000/";
-const sideCtl  = document.getElementById("controls");
-const wsStatus = document.getElementById("wsStatus");
-const angleDiv = document.getElementById("angleGrid");
-const sensGrid = document.getElementById("sensorGrid");
-const sensStamp= document.getElementById("sensStamp");
-const rawLine  = document.getElementById("rawLine");
-const lastStamp= document.getElementById("lastStamp");
-const mapping  = [0, 1, 2, 13, 14, 15];
+  const WS_URL = "ws://localhost:9000/";
+  const controls = document.getElementById("controls");
+  const wsStatus = document.getElementById("wsStatus");
+  const angleGrid = document.getElementById("angleGrid");
+  const sensorGrid = document.getElementById("sensorGrid");
+  const sensStamp = document.getElementById("sensStamp");
+  const rawLine = document.getElementById("rawLine");
+  const lastStamp = document.getElementById("lastStamp");
+  const servoMap = [0, 1, 2, 13, 14, 15];
+  let ws;
 
-/* ───── Create sliders & readouts ─────────────────────────────── */
-mapping.forEach(ch => {
-  const wrap = document.createElement("div");
-  wrap.className = "servo";
-  wrap.innerHTML = `
-    <label>Servo ${ch}<span id="v${ch}">90°</span></label>
-    <input id="s${ch}" type="range" min="0" max="180" value="90">`;
-  sideCtl.appendChild(wrap);
-
-  // Send angle live over WebSocket
-  wrap.querySelector("input").addEventListener("input", e => {
-    document.getElementById("v" + ch).textContent = e.target.value + "°";
-    if (ws?.readyState === 1)
-      ws.send(JSON.stringify({ servo: ch, angle: +e.target.value }));
-  });
-
-  /* angle badges in lower panel */
-  const tag = document.createElement("div");
-  tag.id = "ang" + ch;
-  tag.textContent = `S${ch}: 90°`;
-  angleDiv.appendChild(tag);
-});
-
-/* ───── Utility functions ─────────────────────────────────────── */
-const stampNow   = el => el.textContent = new Date().toLocaleTimeString();
-const updateAngle = (ch, val) => {
-  document.getElementById("s" + ch).value           = val;
-  document.getElementById("v" + ch).textContent     = val + "°";
-  document.getElementById("ang" + ch).textContent   = `S${ch}: ${val}°`;
-};
-
-/* ───── WebSocket connection ─────────────────────────────────── */
-let ws;
-function connect() {
-  ws = new WebSocket(WS_URL);
-
-  ws.onopen  = () => {
-    wsStatus.textContent = "WebSocket: 🟢 connected";
-    stampNow(lastStamp);
-  };
-
-  ws.onclose = () => {
-    wsStatus.textContent = "WebSocket: ❌ disconnected";
-  };
-
-  ws.onerror = err => console.error(err);
-
-  ws.onmessage = ev => {
-    try {
-      const d = JSON.parse(ev.data);
-
-      // Live servo update
-      if ("servo" in d && "angle" in d) {
-        updateAngle(d.servo, d.angle);
-        stampNow(lastStamp);
-      }
-
-      // Raw serial packet
-      if ("serial" in d) {
-        rawLine.textContent = d.serial;
-        stampNow(lastStamp);
-        if (d.serial.startsWith("#SENS|")) parseSensors(d.serial);
-      }
-    } catch (e) {
-      console.warn("Malformed WS message:", ev.data);
+  function sendReconnectCommand() {
+    if (ws?.readyState === 1) {
+      ws.send(JSON.stringify({ reconnect: true }));
     }
+  }
+
+  const stampNow = el => el.textContent = new Date().toLocaleTimeString();
+
+  const updateAngle = (ch, val) => {
+    document.getElementById("s" + ch).value = val;
+    document.getElementById("v" + ch).textContent = val + "°";
+    document.getElementById("ang" + ch).textContent = `S${ch}: ${val}°`;
   };
-}
-connect();
 
-/* ───── Parse packet  #SENS|MPU:...|AN:... ─────────────────────── */
-function parseSensors(line) {
-  sensStamp.textContent = new Date().toLocaleTimeString();
-  sensGrid.innerHTML = ""; // clear grid
+  function connect() {
+    ws = new WebSocket(WS_URL);
 
-  const payload = line.slice(6).split("|");
-  payload.forEach(pair => {
-    const [k, v] = pair.split(":");
-    const cell   = document.createElement("div");
-    cell.className = "cell";
-    cell.textContent = `${k}: ${v}`;
-    sensGrid.appendChild(cell);
+    ws.onopen = () => {
+      wsStatus.textContent = "WebSocket: 🟢 Connected";
+      stampNow(lastStamp);
+      ws.send(JSON.stringify({ handshake: true }));
+    };
+
+    ws.onclose = () => wsStatus.textContent = "WebSocket: ❌ Disconnected";
+    ws.onerror = err => console.error("WebSocket error:", err);
+
+    ws.onmessage = ev => {
+      try {
+        const data = JSON.parse(ev.data);
+
+        if ("servo" in data && "angle" in data) {
+          updateAngle(data.servo, data.angle);
+          stampNow(lastStamp);
+        }
+
+        if ("serial" in data) {
+          rawLine.textContent = data.serial;
+          stampNow(lastStamp);
+          if (data.serial.startsWith("#SENS|")) parseSensors(data.serial);
+        }
+
+        if ("sensors" in data) {
+          parseSensorObject(data.sensors);
+          stampNow(lastStamp);
+        }
+      } catch (e) {
+        console.warn("Malformed WS message:", ev.data);
+      }
+    };
+  }
+  connect();
+
+  function parseSensors(line) {
+    sensStamp.textContent = new Date().toLocaleTimeString();
+    sensorGrid.innerHTML = "";
+    line.slice(6).split("|").forEach(pair => {
+      const [k, v] = pair.split(":");
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      cell.textContent = `${k}: ${v}`;
+      sensorGrid.appendChild(cell);
+    });
+  }
+
+  function parseSensorObject(obj) {
+    sensStamp.textContent = new Date().toLocaleTimeString();
+    sensorGrid.innerHTML = "";
+    for (const key in obj) {
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      cell.textContent = `${key}: ${obj[key]}`;
+      sensorGrid.appendChild(cell);
+    }
+  }
+
+  servoMap.forEach(ch => {
+    const wrapper = document.createElement("div");
+    wrapper.className = "servo";
+    wrapper.innerHTML = `<label>Servo ${ch} <span id="v${ch}">90°</span></label>
+      <input id="s${ch}" type="range" min="0" max="180" value="90">`;
+    controls.appendChild(wrapper);
+
+    wrapper.querySelector("input").addEventListener("input", e => {
+      const val = +e.target.value;
+      updateAngle(ch, val);
+      if (ws?.readyState === 1) ws.send(JSON.stringify({ servo: ch, angle: val }));
+    });
+
+    const tag = document.createElement("div");
+    tag.id = "ang" + ch;
+    tag.textContent = `S${ch}: 90°`;
+    angleGrid.appendChild(tag);
   });
-}
+
+  // ───── Sample Buttons ─────
+  const samplePanel = document.createElement("div");
+  samplePanel.innerHTML = `<h2> Sample Actions</h2>`;
+  for (let i = 1; i <= 5; i++) {
+    const btn = document.createElement("button");
+    btn.textContent = `▶ Sample ${i}`;
+    btn.className = "sampleBtn";
+    btn.onclick = () => {
+      if (ws?.readyState === 1) ws.send(JSON.stringify({ sample: i }));
+    };
+    samplePanel.appendChild(btn);
+  }
+  document.getElementById("sidebar").appendChild(samplePanel);
+
+  // ───── Keyboard Control ─────
+  document.addEventListener("keydown", e => {
+    if (!ws || ws.readyState !== 1) return;
+    const map = {
+      q: [0, -2], a: [0, 2], w: [1, -2], s: [1, 2],
+      e: [2, -2], d: [2, 2], r: [13, -2], f: [13, 2],
+      t: [14, -2], g: [14, 2], y: [15, -2], h: [15, 2]
+    };
+    const pair = map[e.key.toLowerCase()];
+    if (pair) {
+      const [servo, delta] = pair;
+      const slider = document.getElementById("s" + servo);
+      let val = Math.max(0, Math.min(180, +slider.value + delta));
+      updateAngle(servo, val);
+      ws.send(JSON.stringify({ servo, angle: val }));
+    }
+  });
+
+  // ───── Gamepad Polling ─────
+  let gamepadIndex = null;
+  window.addEventListener("gamepadconnected", e => gamepadIndex = e.gamepad.index);
+  window.addEventListener("gamepaddisconnected", () => gamepadIndex = null);
+
+  function pollGamepad() {
+    if (gamepadIndex !== null) {
+      const gp = navigator.getGamepads()[gamepadIndex];
+      if (gp) {
+        const axis0 = gp.axes[0];
+        const axis1 = gp.axes[1];
+        const val0 = Math.floor((axis0 + 1) * 90);
+        const val1 = Math.floor((axis1 + 1) * 90);
+        updateAngle(0, val0);
+        updateAngle(1, val1);
+        ws?.send(JSON.stringify({ servo: 0, angle: val0 }));
+        ws?.send(JSON.stringify({ servo: 1, angle: val1 }));
+      }
+    }
+    requestAnimationFrame(pollGamepad);
+  }
+  pollGamepad();
 </script>
 </body>
 </html>
