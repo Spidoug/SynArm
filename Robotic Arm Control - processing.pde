@@ -2,16 +2,16 @@
 //  SynArm
 //  Robotic Arm Control – Leap Motion · Joystick · Keyboard · WebSockets
 // ---------------------------------------------------------------------
-//  ✉ Douglas Santana (SPIDOUG)
+//  Douglas Santana (SPIDOUG)
 // =====================================================================
 
 // ==============================
-// 🏷 Imports and Libraries
+//  Imports and Libraries
 // ==============================
 import de.voidplus.leapmotion.*;
 import processing.serial.*;
-import org.gamecontrolplus.*;        
-import net.java.games.input.*;       
+import org.gamecontrolplus.*;
+import net.java.games.input.*;
 import websockets.*;               //  ←  NEW
 import java.util.List;
 import javax.swing.JFrame;
@@ -20,20 +20,20 @@ import java.awt.Image;
 import java.io.File;
 
 // ==============================
-// 🌐 WebSocket Server
+//  WebSocket Server
 // ==============================
 WebsocketServer wsServer;
 final int WS_PORT = 9000;
 final String WS_PATH = "/";
 
 // ==============================
-// 📡 Serial & Sensor variables
+//  Serial & Sensor variables
 // ==============================
 String   latestSerialLine = "";    // last raw line from Arduino
 JSONObject latestSensors  = new JSONObject();
 
 // ==============================
-// 🎮 Joystick and Control
+//  Joystick and Control
 // ==============================
 ControlIO control;
 ControlDevice joystick;
@@ -41,15 +41,17 @@ boolean joystickConnected = false;
 float[] joystickPos = new float[4]; // [x, y, z, r]
 
 // ==============================
-// ⚙️ System and Configuration
+// ️System and Configuration
 // ==============================
+boolean enableLeap = true;
+boolean enableJoystick = true;
 boolean arduinoReady = false;
 boolean leapAvailable = false;
 long lastServoCommandTime = 0;
 int movementTimeout = 500;
 
 // ==============================
-// 🚧 Leap‑Motion stability constants (NEW)
+//  Leap‑Motion stability constants (NEW)
 // ==============================
 final int LEAP_UPDATE_PERIOD = 30;   // ms between Leap→servo pushes
 final int ANGLE_DEADBAND     = 2;    // ignore ±2 deg micro‑variations
@@ -62,7 +64,7 @@ ArrayList<Box3D> collidingBoxes = new ArrayList<Box3D>();
 ArrayList<String> pendingWsCommands = new ArrayList<String>();
 
 // ==============================
-// 📦 Serial Port
+//  Serial Port
 // ==============================
 String[] ports;
 int portIndex = 0;
@@ -70,29 +72,33 @@ Serial testPort;
 int arduinoStartTime = 0;
 
 // ==============================
-// 🧠 System States
+//  System States
 // ==============================
 int initializationStep = 0;
 boolean waiting = false;
 int waitDuration = 0;
 int waitStartTime = 0;
 String[] logMessages = new String[4];
-String currentMessage = "🔄 Initializing system...";
+String currentMessage = "Initializing system...";
 float cameraRotationIncrement = 0;
 
 String controlInstructions =
-  "🎮 ARM CONTROL (KEYBOARD)\n" +
+  "   ARM CONTROL (KEYBOARD)\n" +
   "\n" +
-  "  Q / A   :  Base        \n" +
-  "  W / S   :  Shoulder    \n" +
-  "  E / D   :  Elbow       \n" +
-  "  R / F   :  Wrist Tilt  \n" +
-  "  T / G   :  Wrist Rot.  \n" +
-  "  Y / H   :  Gripper     \n" +
+  "  Q / A   : Base                      \n" +
+  "  W / S   : Shoulder                  \n" +
+  "  E / D   : Elbow                     \n" +
+  "  R / F   : Wrist Tilt                \n" +
+  "  T / G   : Wrist Rotate              \n" +
+  "  Y / H   : Gripper                   \n" +
+  "     N      :  Reconnect\n" +
+  "     L      :  Enable/Disable Leap Motion\n" +
+  "     J      :  Enable/Disable Joystick   \n" +
+  " 1 / 2 / 3 / 4 / 5 :  Controls of Samples\n" +
   "  ← / →   :  Rotate camera";
 
 // ==============================
-// 🤖 Servo Angles
+//  Servo Angles
 // ==============================
 int[] angles = {90, 90, 180, 90, 90, 140}; // Base, Arm, Forearm, Wrist V, Wrist R, Gripper
 int[][] servoLimits = {
@@ -106,19 +112,19 @@ final int WRIST_ROT  = 4;
 final int GRIPPER    = 5;
 
 // ==============================
-// 🎹 Keyboard
+//  Keyboard
 // ==============================
 boolean[] keyPressedStates = new boolean[6];
 int[] keyboardIncrement   = {0, 0, 0, 0, 0, 0};
 
 // ==============================
-// 🎥 3D Camera
+//  3D Camera
 // ==============================
 float cameraRotationY = 0;
 int selectedPart = -1;
 
 // ==============================
-// 📼 Samples (Recording/Playback)
+//  Samples (Recording/Playback)
 // ==============================
 @SuppressWarnings("unchecked")
   ArrayList<int[]>[] samples = (ArrayList<int[]>[]) new ArrayList[5];
@@ -149,11 +155,12 @@ void setup() {
   // --------------------------------------------------------
   try {
     wsServer = new WebsocketServer(this, WS_PORT, WS_PATH);
-    println("🌐 WebSocket server started on ws://localhost:" + WS_PORT);
-    updateMessage("🌐 WS server online (port " + WS_PORT + ")");
-  } catch (Exception e) {
-    println("❌ Could not start WS server: " + e.getMessage());
-    updateMessage("⚠️ WS server failed");
+    println("WebSocket server started on ws://localhost:" + WS_PORT);
+    updateMessage("WS server online (port " + WS_PORT + ")");
+  }
+  catch (Exception e) {
+    println("Could not start WS server: " + e.getMessage());
+    updateMessage("WS server failed");
   }
 
   // --------------------------------------------------------
@@ -172,56 +179,11 @@ void setup() {
     samples[i] = new ArrayList<int[]>();
   }
 
-  updateMessage("🔄 Initializing …");
-
-  // --------------------------------------------------------
-  // GameControlPlus  – joystick detection / XML mapping
-  // --------------------------------------------------------
-  try {
-    control = ControlIO.getInstance(this);
-
-    // ➊  Ensure we have a mapping XML
-    File xmlFile = new File(sketchPath("data/gamecontrol.xml"));
-    if (!xmlFile.exists()) {
-      println("⚠️  gamecontrol.xml not found – generating default mapping …");
-      if (control.getNumberOfDevices() > 0) {
-        ControlDevice dev = control.getDevice(0);   // first HID device
-        createDefaultJoystickXML(dev);              // helper defined elsewhere
-      } else {
-        println("⛔ No HID devices detected – joystick disabled.");
-      }
-    }
-
-    // ➋  Load joystick by the default XML name, else fall back
-    joystick = control.getDevice("Generic-GCP-Joystick");   // name given in auto‑XML
-
-    if (joystick == null) {
-      println("⚠️  Mapping name not found; falling back to first HID device.");
-      if (control.getNumberOfDevices() > 0) {
-        joystick = control.getDevice(0);
-      }
-    }
-
-    joystickConnected = (joystick != null);
-
-    if (joystickConnected) {
-      println("🕹️  Joystick connected: " + joystick.getName());
-      for (ControlInput inp : joystick.getInputs()) {
-        println("   • " + inp.getName());
-      }
-    } else {
-      println("⚠️  No joystick detected.");
-    }
-
-  } catch (Exception e) {
-    println("❌ GameControlPlus initialization error: " + e.getMessage());
-    e.printStackTrace();
-    joystickConnected = false;
-  }
+  updateMessage("Initializing …");
 }
 
 // ==============================
-// 🎬 Draw
+//  Draw
 // ==============================
 void draw() {
   background(230);
@@ -236,9 +198,10 @@ void draw() {
 
   // 3D transformations for viewing
   pushMatrix();
-  translate(700, height / 2 + 100);
-  rotateX(PI / -6);
+  translate(width/2 + 150, height / 2 + 100);
+  rotateX(PI / -8);
   rotateY(cameraRotationY);
+
   drawArm3D();
   drawCollisionBoxes();
   popMatrix();
@@ -246,14 +209,15 @@ void draw() {
   cameraRotationY += cameraRotationIncrement;
 
   drawHUD();
-  drawProgressBar();
   drawControlInstructions();
   drawTextInterface();
+  drawProgressBar(200, 15, 150, height - 90);
 
   // Based on your initialization steps
   switch (initializationStep) {
   case 0:
     checkLeapMotion();
+    checkJoystick();
     break;
   case 1:
     checkLastPort();
@@ -279,11 +243,11 @@ void draw() {
 }
 
 // ==============================
-// 🔄 System Control Handlers
+//  System Control Handlers
 // ==============================
 void updateControls() {
-  updateWithLeap();
-  updateWithJoystick();
+  if (enableLeap)     updateWithLeap();
+  if (enableJoystick) updateWithJoystick();
   updateWithKeyboard();
   handleRecording();
   handlePlayback();
@@ -299,20 +263,19 @@ void updateWithLeap() {
   for (Hand hand : leap.getHands()) {
     if (hand.isRight()) {
       int newWristV  = (int) map(hand.getPitch(), -60, 60, 0, 180);
-      int newWristR  = (int) map(hand.getRoll(),  -60, 60, 0, 180);
+      int newWristR  = (int) map(hand.getRoll(), -60, 60, 0, 180);
       int newGripper = (int) map(hand.getPinchStrength(), 0, 1, 100, 180);
 
-      maybeSetAngle(13, smooth(angles[WRIST_VERT], newWristV, 0.15f));
-      maybeSetAngle(14, smooth(angles[WRIST_ROT], newWristR, 0.15f));
-      maybeSetAngle(15, smooth(angles[GRIPPER],    newGripper, 0.15f));
-    }
-    else if (hand.isLeft()) {
-      int newBase    = (int) map(hand.getYaw(),   60, -60, 0, 180);
+      maybeSetAngle(13, smooth(angles[WRIST_VERT], newWristV, 0.20f));
+      maybeSetAngle(14, smooth(angles[WRIST_ROT], newWristR, 0.20f));
+      maybeSetAngle(15, smooth(angles[GRIPPER], newGripper, 0.15f));
+    } else if (hand.isLeft()) {
+      int newBase    = (int) map(hand.getYaw(), 60, -60, 0, 180);
       int newArm     = (int) map(hand.getPitch(), -60, 60, 0, 180);
-      int newForearm = (int) map(hand.getRoll(),  -60, 60, 0, 180);
+      int newForearm = (int) map(hand.getRoll(), -60, 60, 0, 180);
 
-      maybeSetAngle(0, smooth(angles[BASE],    newBase,    0.15f));
-      maybeSetAngle(1, smooth(angles[ARM],     newArm,     0.15f));
+      maybeSetAngle(0, smooth(angles[BASE], newBase, 0.15f));
+      maybeSetAngle(1, smooth(angles[ARM], newArm, 0.15f));
       maybeSetAngle(2, smooth(angles[FOREARM], newForearm, 0.15f));
     }
   }
@@ -330,11 +293,11 @@ void updateWithJoystick() {
 
   setAngle(0, angles[BASE]        + (int)(sx.getValue() * 2));
   setAngle(1, angles[ARM]         - (int)(sy.getValue() * 2));
-  if (sz != null) setAngle(2,  angles[FOREARM] + (int)(sz.getValue() * 2));
+  if (sz != null) setAngle(2, angles[FOREARM] + (int)(sz.getValue() * 2));
   if (sr != null) setAngle(13, angles[WRIST_VERT] - (int)(sr.getValue() * 2));
 
   ControlButton bClose = safeButton("gripper_close_button", 0);
-  ControlButton bOpen  = safeButton("gripper_open_button",  1);
+  ControlButton bOpen  = safeButton("gripper_open_button", 1);
   if (bClose != null && bClose.pressed()) setAngle(15, angles[GRIPPER] + 1);
   if (bOpen  != null &&  bOpen.pressed()) setAngle(15, angles[GRIPPER] - 1);
 }
@@ -376,7 +339,7 @@ void handlePlayback() {
         lastFrameTime[i] = millis();
       } else {
         playingBack[i] = false;
-        updateMessage("✅ Sample " + (i + 1) + " playback finished.");
+        updateMessage("Sample " + (i + 1) + " playback finished.");
       }
     }
   }
@@ -387,9 +350,14 @@ int smooth(int current, int target, float factor) {
 }
 
 // ==============================
-// 🎮 Input Events
+//  Input Events
 // ==============================
 void keyPressed() {
+
+  if (key == 'l') enableLeap = !enableLeap;
+  if (key == 'j') enableJoystick = !enableJoystick;
+  if (key == 'n') Reconnect();
+
   switch (key) {
   case 'q':
     keyPressedStates[0] = true;
@@ -439,10 +407,26 @@ void keyPressed() {
     keyPressedStates[5] = true;
     keyboardIncrement[5] = -1;
     break;
-
+  case '1':
+    handleSampleButton(0);
+    break;
+  case '2':
+    handleSampleButton(1);
+    break;
+  case '3':
+    handleSampleButton(2);
+    break;
+  case '4':
+    handleSampleButton(3);
+    break;
+  case '5':
+    handleSampleButton(4);
+    break;
   case CODED:
-    if (keyCode == LEFT)  cameraRotationIncrement = -0.02;
-    else if (keyCode == RIGHT) cameraRotationIncrement = 0.02;
+    if (mouseX >= 300) {
+      if (keyCode == LEFT)  cameraRotationIncrement = -0.02;
+      else if (keyCode == RIGHT) cameraRotationIncrement = 0.02;
+    }
     break;
   }
 }
@@ -488,11 +472,77 @@ void keyReleased() {
 
 void mouseWheel(MouseEvent event) {
   float scroll = event.getCount();
-  cameraRotationY += scroll * 0.05;
+  if (mouseX >= 300) {
+    cameraRotationY += scroll * 0.05;
+  }
 }
 
+void handleSampleButton(int index) {
+
+  // ——— STOP recording ———
+  if (recording && selectedSample == index) {
+    recording = false;
+
+    File file = new File(sketchPath("data/samples/sample_" + index + ".json"));
+
+    if (!file.exists()) {
+      JSONArray jsonArray = new JSONArray();
+      for (int[] frame : samples[index]) {
+        JSONArray frameArray = new JSONArray();
+        for (int val : frame) frameArray.append(val);
+        jsonArray.append(frameArray);
+      }
+
+      try {
+        saveJSONArray(jsonArray, file.getAbsolutePath());
+        updateMessage("Sample " + (index + 1) + " saved successfully.");
+      }
+      catch (Exception e) {
+        println("Error saving sample " + (index + 1) + ": " + e.getMessage());
+        e.printStackTrace();
+        updateMessage("Failed to save sample " + (index + 1));
+      }
+    } else {
+      updateMessage("File already exists. Recording not overwritten.");
+    }
+
+    selectedSample = -1;
+  }
+
+  // ——— START playback or recording ———
+  else if (!recording && !isPlaying()) {
+
+    // ▶ Playback
+    if (samples[index].size() > 0) {
+      playingBack[index]   = true;
+      playbackIndex[index] = 0;
+      lastFrameTime[index] = millis();
+      updateMessage("Playing sample " + (index + 1));
+    }
+
+    //Record
+    else {
+      File file = new File(sketchPath("data/samples/sample_" + index + ".json"));
+      if (file.exists()) {
+        updateMessage("Slot " + (index + 1) + " already has a recording.");
+      } else {
+        recording      = true;
+        selectedSample = index;
+        samples[index].clear();
+        updateMessage("Recording sample " + (index + 1));
+      }
+    }
+  }
+
+  // ——— Busy with another sample ———
+  else {
+    updateMessage("Cannot record or play while another sample is active.");
+  }
+}
+
+
 // ==============================
-// 🔄 Collision & Bounding Boxes
+//  Collision & Bounding Boxes
 // ==============================
 class Box3D {
   PVector position;
@@ -525,7 +575,7 @@ boolean checkCollision() {
       if (abs(i - j) == 1) continue; // skip immediate neighbors if desired
       Box3D b1 = boundingBoxes.get(i);
       Box3D b2 = boundingBoxes.get(j);
-      if (intersectsWithTolerance(b1, b2, 4)) {
+      if (intersectsWithTolerance(b1, b2, 2)) {
         collidingBoxes.add(b1);
         collidingBoxes.add(b2);
         anyCollision = true;
@@ -539,47 +589,47 @@ void collectArmBoundingBoxes() {
   boundingBoxes.clear();
 
   pushMatrix();
-  translate(700, height / 2 + 100);
-  rotateX(-PI / 6);
+  translate(width / 2 + 150, height / 2 + 100); // same anchor point as 3D scene
+  rotateX(-PI / 8);
 
-  // Base
+  //Base cylinder (static)
   boundingBoxes.add(new Box3D(modelToWorld(0, -36, 0), 76, 72, 76));
 
-  // Move up to the servo base
-  translate(0, -64, 0);
+  //Vertical base (tower)
+  translate(0, -64, 0); // base height
   rotateY(radians(angles[BASE]));
   boundingBoxes.add(new Box3D(modelToWorld(0, 0, 0), 12.8f, 51.2f, 12.8f));
   translate(0, -25.6f, 0);
 
-  // Arm (servo 1)
+  //Upper Arm (servo 1)
   pushMatrix();
   rotateZ(radians(angles[ARM] - 90));
   translate(0, -38.4f, 0);
   boundingBoxes.add(new Box3D(modelToWorld(0, 0, 0), 12.8f, 76.8f, 12.8f));
   translate(0, -38.4f, 0);
 
-  // Forearm (servo 2)
+  //Forearm (servo 2)
   pushMatrix();
   rotateZ(radians(angles[FOREARM] - 180));
-  translate(0, -32, 0);
+  translate(0, -35, 0); // 70 / 2
   boundingBoxes.add(new Box3D(modelToWorld(0, 0, 0), 12.8f, 70, 12.8f));
-  translate(0, -32, 0);
+  translate(0, -35, 0);
 
-  // Wrist vertical (servo 13)
+  //Wrist Vertical (servo 13)
   pushMatrix();
   rotateZ(radians(angles[WRIST_VERT] - 90));
-  translate(0, -16, 0);
-  boundingBoxes.add(new Box3D(modelToWorld(0, 0, 0), 8, 32, 8));
-  translate(0, -16, 0);
+  translate(0, -35, 0); // same as forearm
+  boundingBoxes.add(new Box3D(modelToWorld(0, 0, 0), 12.8f, 70, 12.8f));
+  translate(0, -35, 0);
 
-  // Wrist rotation (servo 14)
+  //Wrist Rotation (servo 14)
   rotateY(radians(angles[WRIST_ROT] - 90));
 
-  // Gripper (servo 15)
+  //Gripper (servo 15)
   pushMatrix();
   translate(0, -6.4f, 0);
 
-  // Left gripper
+  //Left finger
   pushMatrix();
   translate(6.4f, 0, 0);
   rotateZ(radians(-(angles[GRIPPER] - 140)));
@@ -587,7 +637,7 @@ void collectArmBoundingBoxes() {
   boundingBoxes.add(new Box3D(modelToWorld(0, 0, 0), 2.4f, 32, 4));
   popMatrix();
 
-  // Right gripper
+  //Right finger
   pushMatrix();
   translate(-6.4f, 0, 0);
   rotateZ(radians(angles[GRIPPER] - 140));
@@ -601,20 +651,41 @@ void collectArmBoundingBoxes() {
   popMatrix(); // end arm
   popMatrix(); // end base
 
-  // After building, check collisions
+  //Perform collision check
   checkCollision();
 }
 
 // Purely for drawing the robot arm (no boundingBoxes logic)
 void drawArm3D() {
+
+  // --- Floor and Green Cube ---
+  pushMatrix();
+
+  //Robot floor (at y = 30, below the base center)
+  translate(0, 30, 0); // places the floor at the correct visual level
+  fill(229, 220, 220);
+  noStroke();
+  box(400, 10, 400);  // larger floor for better visibility
+
+  // Green cube
+  pushMatrix();
+  translate(0, -35, 180); // y = -35 touches the floor (cube height = 70), z = -120 is in front
+  fill(100, 200, 100);
+  box(12.8f, 70, 12.8f);
+  popMatrix();
+
+  popMatrix(); // floor anchor
+
+  // --- Robotic Arm ---
   pushMatrix();
   fill(80);
-  drawCylinder(38.4f, 72);
-  translate(0, -64, 0);
+  drawCylinder(38.4f, 72);           // cylindrical base
+  translate(0, -64, 0);              // base height
   rotateY(radians(angles[BASE]));
-  box(12.8f, 51.2f, 12.8f);
+  box(12.8f, 51.2f, 12.8f);          // vertical base tower
   translate(0, -25.6f, 0);
 
+  // --- Upper Arm (servo 1) ---
   pushMatrix();
   rotateZ(radians(angles[ARM] - 90));
   translate(0, -38.4f, 0);
@@ -622,26 +693,30 @@ void drawArm3D() {
   box(12.8f, 76.8f, 12.8f);
   translate(0, -38.4f, 0);
 
+  // --- Forearm (servo 2) ---
   pushMatrix();
   rotateZ(radians(angles[FOREARM] - 180));
-  translate(0, -32, 0);
+  translate(0, -35, 0); // 70/2 = 35
   fill(100, 200, 100);
   box(12.8f, 70, 12.8f);
-  translate(0, -32, 0);
+  translate(0, -35, 0);
 
+  // --- Wrist Vertical (servo 13) ---
   pushMatrix();
   rotateZ(radians(angles[WRIST_VERT] - 90));
-  translate(0, -16, 0);
+  translate(0, -35, 0); // same size as forearm
   fill(100, 100, 200);
-  box(8, 32, 8);
-  translate(0, -16, 0);
+  box(12.8f, 70, 12.8f);
+  translate(0, -35, 0);
 
+  // --- Wrist Rotation (servo 14) ---
   rotateY(radians(angles[WRIST_ROT] - 90));
 
+  // --- Gripper (servo 15) ---
   pushMatrix();
   translate(0, -6.4f, 0);
 
-  // Left gripper
+  // Left Gripper Finger
   pushMatrix();
   translate(6.4f, 0, 0);
   rotateZ(radians(-(angles[GRIPPER] - 140)));
@@ -650,7 +725,7 @@ void drawArm3D() {
   box(2.4f, 32, 4);
   popMatrix();
 
-  // Right gripper
+  // Right Gripper Finger
   pushMatrix();
   translate(-6.4f, 0, 0);
   rotateZ(radians(angles[GRIPPER] - 140));
@@ -659,11 +734,11 @@ void drawArm3D() {
   box(2.4f, 32, 4);
   popMatrix();
 
-  popMatrix(); // gripper
-  popMatrix(); // wrist
-  popMatrix(); // forearm
-  popMatrix(); // arm
-  popMatrix(); // base
+  popMatrix(); // end gripper
+  popMatrix(); // end wrist
+  popMatrix(); // end forearm
+  popMatrix(); // end upper arm
+  popMatrix(); // end base
 }
 
 // NEW: draw collision boxes (red) to visualize them
@@ -724,29 +799,37 @@ PVector modelToWorld(float x, float y, float z) {
 }
 
 // ==============================
-// 🖥️ UI Elements
+// ️ UI Elements
 // ==============================
 void drawSidebar() {
   fill(255);
   stroke(200);
   strokeWeight(1);
+  textSize(12);
   rect(0, 0, 300, height);
 
   for (int i = 0; i < 5; i++) {
-    String label = (selectedSample == i && recording) ? "⏹ Stop Sample " + (i + 1)
-      : "▶ Sample " + (i + 1);
+    boolean hasSample = samples[i] != null && samples[i].size() > 0;
+    boolean isPlaying = playingBack[i];
     boolean isSelected = (selectedSample == i);
-    drawButton(20, 20 + i * 50, 260, 35, label, recording, isSelected);
+    boolean isRecording = (recording && selectedSample == i);
+    String label = isRecording ? "Stop Sample " + (i + 1) : "Sample " + (i + 1);
+
+    drawButton(20, 20 + i * 50, 260, 35, label, hasSample, isPlaying, isRecording);
   }
 
-  drawButton(20, height - 60, 260, 35, "Reconnect", false, false);
+  drawButton(20, height - 60, 260, 35, "Reconnect", false, false, false);
 }
 
-void drawButton(int x, int y, int w, int h, String label, boolean isRecording, boolean isSelected) {
-  if (isRecording && isSelected) {
-    fill(255, 100, 100);
+void drawButton(int x, int y, int w, int h, String label, boolean hasSample, boolean isPlaying, boolean isRecording) {
+  if (isRecording) {
+    fill(139, 149, 255);     // blue: recording
+  } else if (isPlaying) {
+    fill(255, 100, 100);   // red: playing
+  } else if (hasSample) {
+    fill(0, 200, 100);     // green: has sample
   } else {
-    fill(240);
+    fill(230);             // default gray
   }
 
   stroke(150);
@@ -766,19 +849,41 @@ void drawHUD() {
   textSize(12);
   fill(20);
 
-  text("📸 Camera Y Rotation: " + nf(degrees(cameraRotationY), 1, 1) + "°", 630, 20);
+  float camAngleDeg = (degrees(cameraRotationY) % 360 + 360) % 360;
+  text("CAMERA Y ROTATION: " + nf(camAngleDeg, 1, 1) + "°", width/2 + 100, height - 45);
 
   color statusColor = color(255);
   String statusLabel = "Disconnected";
 
   if (arduinoReady) {
     boolean recentlyMoved = (millis() - lastServoCommandTime) < movementTimeout;
-    statusColor = recentlyMoved ? color(50, 150, 255) : color(0, 200, 100);
+    statusColor = recentlyMoved ? color(255, 100, 100) : color(0, 200, 100);
     statusLabel = recentlyMoved ? "Moving" : "Idle";
 
-    fill(70);
-    textAlign(LEFT, CENTER);
-    text("Last move: " + (millis() - lastServoCommandTime) + " ms ago", 340, height - 45);
+    fill(30);
+    textSize(12);
+    textAlign(LEFT, TOP);
+
+    fill(0);
+    text("SERVO ANGLES", 340, 280);
+    text("Base: " + angles[0], 320, 310);
+    text("Arm: " + angles[1], 320, 330);
+    text("Forearm: " + angles[2], 320, 350);
+    text("Wrist Vertical: " + angles[3], 320, 370);
+    text("Wrist Rotation: " + angles[4], 320, 390);
+    text("Gripper: " + angles[5], 320, 410);
+
+    text("Last move: " + int(((millis() - lastServoCommandTime))/1000) + " s ago", 320, height - 160);
+
+    // Leap Motion status
+    text(leapAvailable ? "Hands detected: " + leap.countHands() : "Leap Motion not available", 320, height - 140);
+
+    // Joystick status
+    text(joystickConnected ? "Joystick connected" : "Joystick not detected", 320, height - 120);
+
+    // Enable/Disable states
+    text("Leap Motion:  " + (enableLeap ? "Enable" : "Disable"), 320, height - 100);
+    text("Joystick:    " + (enableJoystick ? "Enable" : "Disable"), 320, height - 80);
   }
 
   noStroke();
@@ -810,29 +915,40 @@ void drawTextInterface() {
   textAlign(LEFT, BASELINE);
   fill(0);
 
-  text("🔧 Servo Angles:", 20, 290);
-  text("• Base:           " + angles[0], 20, 310);
-  text("• Arm:            " + angles[1], 20, 330);
-  text("• Forearm:        " + angles[2], 20, 350);
-  text("• Wrist Vertical: " + angles[3], 20, 370);
-  text("• Wrist Rotation: " + angles[4], 20, 390);
-  text("• Gripper:        " + angles[5], 20, 410);
-
-  text("📝 Logs:", 20, 440);
+  text("LOG:", 60, 380);
   for (int i = 0; i < logMessages.length; i++) {
-    text(logMessages[i], 5, 460 + i * 16);
+    text(logMessages[i], 20, 400 + i * 26);
   }
+}
 
-  if (leapAvailable) {
-    text("🖐️ Hands detected: " + leap.countHands(), 20, height - 100);
-  } else {
-    text("❌ Leap Motion not available", 20, height - 100);
-  }
+void Reconnect() {
+  updateMessage("Restarting connection...");
 
-  if (joystickConnected) {
-    text("🕹️ Joystick connected", 20, height - 80);
-  } else {
-    text("⚠️ Joystick not detected", 20, height - 80);
+  // Reset flags and timers
+  arduinoReady     = false;
+  leapAvailable    = false;
+  portIndex        = 0;
+  arduinoStartTime = 0;
+  waiting          = false;
+  waitDuration     = 0;
+  waitStartTime    = 0;
+  initializationStep = 0;
+
+
+  // Helper to stop and clear a serial port
+  Serial[] portsToClose = { testPort, myPort };
+  for (int i = 0; i < portsToClose.length; i++) {
+    if (portsToClose[i] != null) {
+      try {
+        portsToClose[i].stop();
+        portsToClose[i].clear();
+      }
+      catch (Exception e) {
+        println("Error stopping port " + i + ": " + e.getMessage());
+        e.printStackTrace();
+      }
+      portsToClose[i] = null;
+    }
   }
 }
 
@@ -841,124 +957,27 @@ void drawTextInterface() {
 // ==============================
 void mousePressed() {
 
-  // 🔁 Reconnect button
-  if (mouseX >= 20 && mouseX <= 280 &&
-      mouseY >= height - 60 && mouseY <= height - 25) {
-
-    updateMessage("🔄 Restarting connection...");
-    initializationStep = 0;
-    arduinoReady     = false;
-    leapAvailable    = false;
-    initializeLog();
-
-    portIndex        = 0;
-    arduinoStartTime = 0;
-    waiting          = false;
-    waitDuration     = 0;
-    waitStartTime    = 0;
-
-    if (testPort != null) {
-      try { testPort.stop(); }
-      catch (Exception e) {
-        println("⚠️ Error stopping testPort:");
-        e.printStackTrace();
-      }
-      testPort = null;
-    }
-
-    if (myPort != null) {
-      try { myPort.stop(); }
-      catch (Exception e) {
-        println("⚠️ Error stopping myPort:");
-        e.printStackTrace();
-      }
-      myPort = null;
-    }
-
-    updateMessage("🔁 Restarting device detection...");
+  //Reconnect button
+  if (mouseX >= 20 && mouseX <= 280 && mouseY >= height - 60 && mouseY <= height - 25) {
+    Reconnect();
   }
 
-  // ▶️ Sample record / play buttons
   for (int i = 0; i < 5; i++) {
     int y1 = 20 + i * 50;
 
     if (mouseX >= 20 && mouseX <= 280 &&
-        mouseY >= y1 && mouseY <= y1 + 35) {
-
-      // ——— STOP recording ———
-      if (recording && selectedSample == i) {
-        recording = false;
-
-        File file = new File(sketchPath("data/samples/sample_" + i + ".json"));
-
-        if (!file.exists()) {
-          JSONArray jsonArray = new JSONArray();
-          for (int[] frame : samples[i]) {
-            JSONArray frameArray = new JSONArray();
-            for (int val : frame) frameArray.append(val);
-            jsonArray.append(frameArray);
-          }
-
-          try {
-            saveJSONArray(jsonArray, file.getAbsolutePath());
-            updateMessage("💾 Sample " + (i + 1) + " saved successfully.");
-          } catch (Exception e) {
-            println("❌ Error saving sample " + (i + 1) + ": " + e.getMessage());
-            e.printStackTrace();
-            updateMessage("⚠️ Failed to save sample " + (i + 1));
-          }
-        } else {
-          updateMessage("⚠️ File already exists. Recording not overwritten.");
-        }
-
-        selectedSample = -1;
-      }
-
-      // ——— START playback or recording ———
-      else if (!recording && !isPlaying()) {
-
-        // ▶ Playback
-        if (samples[i].size() > 0) {
-          playingBack[i]   = true;
-          playbackIndex[i] = 0;
-          lastFrameTime[i] = millis();
-          updateMessage("▶️ Playing sample " + (i + 1));
-        }
-
-        // 🔴 Record
-        else {
-          File file = new File(sketchPath("data/samples/sample_" + i + ".json"));
-          if (file.exists()) {
-            updateMessage("⚠️ Slot " + (i + 1) + " already has a recording.");
-          } else {
-            recording      = true;
-            selectedSample = i;
-            samples[i].clear();
-            updateMessage("🔴 Recording sample " + (i + 1));
-          }
-        }
-      }
-
-      // ——— Busy with another sample ———
-      else {
-        updateMessage("⚠️ Cannot record or play while another sample is active.");
-      }
+      mouseY >= y1 && mouseY <= y1 + 35) {
+      handleSampleButton(i);
     }
   }
 }
 
 // ==============================
-// 📋 System Messages
+//  System Messages
 // ==============================
-void drawProgressBar() {
+void drawProgressBar(float barWidth, float barHeight, float barX, float barY ) {
   if (initializationStep < 100) {
     float progress = constrain(map(initializationStep, 0, 5, 0, 1), 0, 1);
-
-    float barWidth = 200;
-    float barHeight = 15;
-
-    float barX = width / 2 + 160;
-    float barY = height / 2 + 220;
 
     pushMatrix();
     hint(DISABLE_DEPTH_TEST);
@@ -996,7 +1015,7 @@ void initializeLog() {
   for (int i = 0; i < logMessages.length; i++) {
     logMessages[i] = "";
   }
-  currentMessage = "🔄 Initializing system...";
+  currentMessage = "Initializing system...";
 }
 
 void clearLog() {
@@ -1006,7 +1025,7 @@ void clearLog() {
 }
 
 // ==============================
-// 💾 Port Management
+// Port Management
 // ==============================
 String loadLastPort() {
   String[] lines = loadStrings("data/lastPt.txt");
@@ -1022,14 +1041,14 @@ void saveLastPort(String port) {
 }
 
 // ==============================
-// 📊 Servo Limits Loader
+//  Servo Limits Loader
 // ==============================
 void loadServoLimits() {
   File file = new File(sketchPath("data/limits.json"));
   if (!file.exists()) {
     JSONArray jsonArray = new JSONArray();
     int[][] defaultLimits = {
-      {0, 180}, {0, 180}, {10, 180}, {0, 180}, {0, 180}, {100, 180}
+      {0, 180}, {0, 180}, {20, 160}, {0, 180}, {0, 180}, {100, 180}
     };
     for (int i = 0; i < defaultLimits.length; i++) {
       JSONObject obj = new JSONObject();
@@ -1057,24 +1076,72 @@ void loadServoLimits() {
 }
 
 // ==============================
-// 🛠️ Initialization
+// ️ Initialization
 // ==============================
+
+void checkJoystick() {
+  // --------------------------------------------------------
+  // GameControlPlus  – joystick detection / XML mapping
+  // --------------------------------------------------------
+  try {
+    control = ControlIO.getInstance(this);
+
+    // ➊  Ensure we have a mapping XML
+    File xmlFile = new File(sketchPath("data/gamecontrol.xml"));
+    if (!xmlFile.exists()) {
+      println("gamecontrol.xml not found – generating default mapping …");
+      if (control.getNumberOfDevices() > 0) {
+        ControlDevice dev = control.getDevice(0);   // first HID device
+        createDefaultJoystickXML(dev);              // helper defined elsewhere
+      } else {
+        println("No HID devices detected – joystick disabled.");
+      }
+    }
+
+    // ➋  Load joystick by the default XML name, else fall back
+    joystick = control.getDevice("Generic-GCP-Joystick");   // name given in auto‑XML
+
+    if (joystick == null) {
+      println("Mapping name not found; falling back to first HID device.");
+      if (control.getNumberOfDevices() > 0) {
+        joystick = control.getDevice(0);
+      }
+    }
+
+    joystickConnected = (joystick != null);
+
+    if (joystickConnected) {
+      println("Joystick connected: " + joystick.getName());
+      for (ControlInput inp : joystick.getInputs()) {
+        println("   • " + inp.getName());
+      }
+    } else {
+      println("No joystick detected.");
+    }
+  }
+  catch (Exception e) {
+    println("GameControlPlus initialization error: " + e.getMessage());
+    e.printStackTrace();
+    joystickConnected = false;
+  }
+}
+
 void checkLeapMotion() {
-  updateMessage("🔍 Checking Leap Motion...");
+  updateMessage("Checking Leap Motion...");
 
   try {
     leap = new LeapMotion(this);
     leapAvailable = true;
-    updateMessage("🟢 Leap Motion detected.");
+    updateMessage("Leap Motion detected.");
   }
   catch (Exception e) {
     leapAvailable = false;
     leap = null;
 
-    updateMessage("⚠️ Leap Motion NOT detected.");
+    updateMessage("Leap Motion NOT detected.");
 
-    // 🧠 Robust Diagnostic Information:
-    println("❌ Error initializing Leap Motion:");
+    //Robust Diagnostic Information:
+    println("Error initializing Leap Motion:");
     println("  • Type: " + e.getClass().getSimpleName());
     println("  • Message: " + e.getMessage());
     e.printStackTrace();  // Full stack trace for debugging
@@ -1086,20 +1153,19 @@ void checkLeapMotion() {
 
 void checkLastPort() {
   if (checkWait()) {
-    updateMessage("📁 Checking last used port...");
+    updateMessage("Checking last used port...");
     String lastPort = loadLastPort();
     ports = Serial.list();
 
     if (lastPort != null) {
       for (int i = 0; i < ports.length; i++) {
         if (ports[i].equals(lastPort)) {
-          updateMessage("🔁 Attempting to reconnect to last port: " + lastPort);
+          updateMessage("Attempting to reconnect to last port: " + lastPort);
           try {
             testPort = new Serial(this, lastPort, 115200);
-            delay(100);
+            testPort.clear();
             while (testPort.available() > 0) testPort.read();  // flush buffer
             testPort.bufferUntil('\n');
-
             arduinoStartTime = millis();
             portIndex = i;
             startWait(500);
@@ -1107,9 +1173,9 @@ void checkLastPort() {
             return;
           }
           catch (Exception e) {
-            println("❌ Error while trying to reconnect to port " + lastPort + ": " + e.getMessage());
+            println("Error while trying to reconnect to port " + lastPort + ": " + e.getMessage());
             e.printStackTrace();
-            updateMessage("⚠ Failed to automatically reconnect to the last used port.");
+            updateMessage("Failed to automatically reconnect to the last used port.");
             break;
           }
         }
@@ -1124,9 +1190,9 @@ void checkLastPort() {
 
 void listSerialPorts() {
   if (checkWait()) {
-    updateMessage("🔌 Searching for serial ports...");
+    updateMessage("Searching for serial ports...");
     ports = Serial.list();
-    updateMessage("🔎 " + ports.length + " ports found.");
+    updateMessage(" " + ports.length + " ports found.");
     startWait(1000);
     initializationStep = 3;
   }
@@ -1135,7 +1201,7 @@ void listSerialPorts() {
 void testSerialPorts() {
   if (checkWait()) {
     if (portIndex < ports.length) {
-      updateMessage("🔌 Testing port: " + ports[portIndex]);
+      updateMessage("Testing port: " + ports[portIndex]);
       try {
         testPort = new Serial(this, ports[portIndex], 115200);
         testPort.clear();
@@ -1144,15 +1210,15 @@ void testSerialPorts() {
         initializationStep = 4;
       }
       catch (Exception e) {
-        println("❌ Error opening port " + ports[portIndex] + ": " + e.getMessage());
+        println("Error opening port " + ports[portIndex] + ": " + e.getMessage());
         e.printStackTrace();
-        updateMessage("❌ Failed to open port: " + ports[portIndex]);
+        updateMessage("Failed to open port: " + ports[portIndex]);
         portIndex++;
         startWait(500);
       }
     } else {
       initializationStep = 99;
-      updateMessage("⛔ No Arduino port found.");
+      updateMessage("No Arduino port found.");
     }
   }
 }
@@ -1164,15 +1230,11 @@ void connectArduino() {
       myPort = testPort;
       arduinoReady = true;
       clearLog();
-      updateMessage("✅ Arduino connected on port: " + ports[portIndex]);
+      updateMessage("Arduino connected on port: " + ports[portIndex]);
       saveLastPort(ports[portIndex]);
-
-      delay(200);
       myPort.write("READY?\n");
-
       boolean handshakeOk = false;
-      int timeout = millis() + 2000;
-
+      int timeout = millis() + 3000;
       while (millis() < timeout) {
         if (myPort.available() > 0) {
           String reply = myPort.readStringUntil('\n');
@@ -1184,7 +1246,7 @@ void connectArduino() {
       }
 
       if (!handshakeOk) {
-        updateMessage("⚠️ Handshake failed.");
+        updateMessage("Handshake failed.");
         arduinoReady = false;
         return;
       }
@@ -1214,15 +1276,15 @@ void connectArduino() {
                 samples[i].add(frame);
               }
             } else {
-              println("⚠️ JSON array empty or invalid in: sample_" + i + ".json");
+              println("JSON array empty or invalid in: sample_" + i + ".json");
             }
           }
           catch (Exception e) {
-            println("⚠️ Error loading sample " + i + ": " + e.getMessage());
+            println("Error loading sample " + i + ": " + e.getMessage());
             e.printStackTrace();
           }
         } else {
-          println("ℹ️ Sample file not found: sample_" + i + ".json");
+          println("Sample file not found: sample_" + i + ".json");
         }
       }
 
@@ -1232,13 +1294,13 @@ void connectArduino() {
   }
 
   // Timeout: try next port
-  if (millis() - arduinoStartTime > 3000) {
+  if (millis() - arduinoStartTime > 4000) {
     if (testPort != null) {
       try {
         testPort.stop();
       }
       catch (Exception e) {
-        println("⚠️ Error stopping testPort: " + e.getMessage());
+        println("Error stopping testPort: " + e.getMessage());
         e.printStackTrace();
       }
     }
@@ -1249,7 +1311,7 @@ void connectArduino() {
 }
 
 // ==============================
-// ⏳ Timing Helpers
+//  Timing Helpers
 // ==============================
 void startWait(int duration) {
   waiting = true;
@@ -1291,14 +1353,14 @@ void setAngle(int channel, int value) {
     // Escaping a collision
     moveServo(channel, constrained);
     boundingBoxesDirty = true;
-    updateMessage("✅ Escaping collision on servo " + index);
+    updateMessage("Escaping collision on servo " + index);
     lastServoCommandTime = millis();
     return;
   } else if (wasColliding && abs(constrained - oldAngle) <= 4) {
     // Small move to attempt to get out
     moveServo(channel, constrained);
     boundingBoxesDirty = true;
-    updateMessage("⚠ Small adjustment allowed in collision (servo " + index + ")");
+    updateMessage("Small adjustment allowed in collision (servo " + index + ")");
     lastServoCommandTime = millis();
     return;
   } else if (!stillColliding) {
@@ -1312,7 +1374,7 @@ void setAngle(int channel, int value) {
   // Otherwise, revert the angle (blocked by collision)
   angles[index] = oldAngle;
   collectArmBoundingBoxes();
-  updateMessage("⛔ Collision: blocked movement on servo " + index);
+  updateMessage("Collision: blocked movement on servo " + index);
 }
 
 int mapServoIndex(int channel) {
@@ -1353,40 +1415,96 @@ boolean isJoystickActive() {
     if (joystick.getButton("gripper_open_button").pressed())  return true;
   }
   catch (Exception e) {
-    println("⚠️ Joystick read error: " + e.getMessage());
+    println("Joystick read error: " + e.getMessage());
   }
   return false;
 }
 
 //--------------------------------------------------
-// 🌐 WebSocket callback (library v0.4.x)
+//  WebSocket callback (library v0.4.x)
 //--------------------------------------------------
 void webSocketServerEvent(String msg) {
   pendingWsCommands.add(msg.trim());
 }
 
 //--------------------------------------------------
-// 📮 Pending WS commands → servo moves / raw serial
+//  Pending WS commands → servo moves / raw serial
 //--------------------------------------------------
 void processPendingWsCommands() {
   while (!pendingWsCommands.isEmpty()) {
     String cmd = pendingWsCommands.remove(0);
     try {
       JSONObject j = JSONObject.parse(cmd);
-      if (j.hasKey("servo") && j.hasKey("angle")) {
-        setAngle(j.getInt("servo"), j.getInt("angle"));
-      } else if (j.hasKey("serial")) {
-        // forward raw command to Arduino
-        if (arduinoReady && myPort != null) myPort.write(j.getString("serial") + "\n");
+
+      // ───── [1] HANDSHAKE: Send current servo angles and sensor data ─────
+      if (j.hasKey("handshake")) {
+        for (int i = 0; i < 6; i++) {
+          int ch = (i < 3) ? i : i + 10; // Channels: 0,1,2 and 13,14,15
+          int angle = angles[i];
+
+          JSONObject response = new JSONObject();
+          response.setInt("servo", ch);
+          response.setInt("angle", angle);
+          response.setInt("timestamp", millis());
+          wsServer.sendMessage(response.toString());
+        }
+
+        // Optionally send the latest sensor data as well
+        if (latestSensors != null && latestSensors.size() > 0) {
+          JSONObject sensorMsg = new JSONObject();
+          sensorMsg.setJSONObject("sensors", latestSensors);
+          wsServer.sendMessage(sensorMsg.toString());
+        }
       }
-    } catch (Exception e) {
-      println("⚠️ Invalid WS msg: " + cmd);
+
+      // ───── [2] SERVO COMMAND: Move a servo to the given angle ─────
+      else if (j.hasKey("servo") && j.hasKey("angle")) {
+        int servo = j.getInt("servo");
+        int angle = j.getInt("angle");
+        setAngle(servo, angle);  // Handles bounding boxes and safety
+      }
+
+      // ───── [3] RAW SERIAL COMMAND: Forward to Arduino ─────
+      else if (j.hasKey("serial")) {
+        if (arduinoReady && myPort != null) {
+          myPort.write(j.getString("serial") + "\n");
+        }
+      }
+
+      // ───── [4] SAMPLE CONTROL: Trigger sample recording or playback ─────
+      else if (j.hasKey("sample")) {
+        int index = j.getInt("sample") - 1;  // sample: 1~5 → index: 0~4
+        if (index >= 0 && index < 5) {
+          handleSampleButton(index);
+          println("WebSocket: Sample " + (index + 1) + " triggered.");
+        } else {
+          println("⚠ WebSocket sample index out of bounds: " + (index + 1));
+        }
+      } else if (j.hasKey("reconnect") && j.getBoolean("reconnect") == true) {
+        println("WebSocket requested reconnection to Arduino");
+        if (myPort != null) {
+          try {
+            myPort.stop();
+          }
+          catch (Exception e) {
+            println("Error stopping current serial port: " + e.getMessage());
+          }
+          myPort = null;
+        }
+        initializationStep = 1; 
+        startWait(500);
+      }
+    }
+
+    catch (Exception e) {
+      println("Invalid WebSocket message: " + cmd);
+      e.printStackTrace();
     }
   }
 }
 
 //--------------------------------------------------
-// 📢 Broadcast every servo move + helper
+//  Broadcast every servo move + helper
 //--------------------------------------------------
 void moveServo(int channel, int angle) {
   if (arduinoReady && myPort != null) {
@@ -1402,7 +1520,7 @@ void moveServo(int channel, int angle) {
 }
 
 //--------------------------------------------------
-// 📥  Serial event – capture ALL lines
+//   Serial event – capture ALL lines
 //--------------------------------------------------
 void serialEvent(Serial port) {
   if (port != myPort) return;      // ignore other ports
@@ -1425,7 +1543,7 @@ void serialEvent(Serial port) {
 }
 
 //--------------------------------------------------
-// 🔎 Parse sensor packet like  #SENS|MPU:ax,ay,az|AN:0,1,2
+//  Parse sensor packet like  #SENS|MPU:ax,ay,az|AN:0,1,2
 //--------------------------------------------------
 void parseSensorPacket(String raw) {
   JSONObject sens = new JSONObject();
@@ -1439,7 +1557,7 @@ void parseSensorPacket(String raw) {
 }
 
 // ------------------------------------------------------------------
-// 🔘 Wrapper: issue servo command only if change > dead‑band
+//  Wrapper: issue servo command only if change > dead‑band
 // ------------------------------------------------------------------
 void maybeSetAngle(int channel, int value) {
   int idx = mapServoIndex(channel);
@@ -1452,25 +1570,31 @@ void maybeSetAngle(int channel, int value) {
 // ---------- Safe helpers (no array API) ----------
 ControlSlider safeSlider(String name, int fallbackIdx) {
 
-  try { return joystick.getSlider(name); }
-  catch (Exception ignored) { }
+  try {
+    return joystick.getSlider(name);
+  }
+  catch (Exception ignored) {
+  }
 
   return (fallbackIdx < joystick.getNumberOfSliders())
-         ? joystick.getSlider(fallbackIdx)
-         : null;
+    ? joystick.getSlider(fallbackIdx)
+    : null;
 }
 
 ControlButton safeButton(String name, int fallbackIdx) {
-  try { return joystick.getButton(name); }
-  catch (Exception ignored) { }
+  try {
+    return joystick.getButton(name);
+  }
+  catch (Exception ignored) {
+  }
 
   return (fallbackIdx < joystick.getNumberOfButtons())
-         ? joystick.getButton(fallbackIdx)
-         : null;
+    ? joystick.getButton(fallbackIdx)
+    : null;
 }
 
 // ========= generates a minimal XML mapping =========
-void createDefaultJoystickXML(ControlDevice dev){
+void createDefaultJoystickXML(ControlDevice dev) {
   String[] lines = {
     "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
     "<gameControlPlus>",
@@ -1485,5 +1609,5 @@ void createDefaultJoystickXML(ControlDevice dev){
     "</gameControlPlus>"
   };
   saveStrings("data/gamecontrol.xml", lines);
-  println("✅ Default gamecontrol.xml created for device: "+dev.getName());
+  println("Default gamecontrol.xml created for device: "+dev.getName());
 }
